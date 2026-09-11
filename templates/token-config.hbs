@@ -1,0 +1,11 @@
+<section class="tab scrollable {{tab.cssClass}}" data-group="{{tab.group}}" data-tab="{{tab.id}}">
+	{{#each tokenAuras as |aura|}}
+	<fieldset>
+		<legend>{{aura.legend}}</legend>
+		<input type="hidden" name="{{aura.uuid.name}}" value="{{aura.uuid.value}}">
+		{{#each aura.inputs as |input|}}
+		{{formGroup input.field name=input.name value=input.value step=input.step units=input.units localize=true rootId=@root.rootId}}
+		{{/each}}
+	</fieldset>
+	{{/each}}
+</section>

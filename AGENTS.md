@@ -8,7 +8,7 @@ This file is the single source of project instructions for all agents. [CLAUDE.m
 
 Token Auras is a [Foundry VTT](https://foundryvtt.com) module. It draws coloured circular or square auras around tokens and adds an "Auras" tab to the token configuration dialog.
 
-This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The code currently targets Foundry v10/v11. **The goal is to port it to Foundry v14.**
+This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The fork targets **Foundry v14** only. Version 2.7 and older of the original module target v10/v11.
 
 ## License and attribution
 
@@ -20,13 +20,24 @@ This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally
 
 | Path | Purpose |
 | --- | --- |
-| `module.json` | Module manifest (id `token-auras`, loads `main.js` via `scripts`). |
+| `module.json` | Module manifest (id `token-auras`, loads `main.js` via `esmodules`). |
 | `main.js` | All module logic: the `Auras` object and its hook registrations. |
+| `templates/token-config.hbs` | Handlebars template for the Auras tab of the token configuration sheets. |
+| `package.json`, `pnpm-lock.yaml` | pnpm project for the build. The only dependency is `fflate`. |
+| `scripts/build.mjs` | Builds `dist/module.json` and `dist/module.zip`. |
+| `.github/workflows/release.yml` | Publishes a GitHub release on every push to the `release` branch. |
 | `lang/*.json` | Translations (`en`, `de`, `fr`, `it`, `pt-BR`). Keys use the `AURAS.` prefix. |
 | `README.md` | User and API documentation. |
 | `example-*.jpg` | Screenshots referenced by the README. |
 
-There is no build step, bundler, package manager, linter or test suite. Foundry loads the files as they are.
+Foundry loads the source files as they are. There is no bundler, transpiler, linter or test suite.
+
+## Build and release
+
+- `pnpm install`, then `pnpm build`. The build copies `module.json`, `main.js`, `lang/`, `templates/`, `LICENSE` and `README.md` into `dist/module.zip`. It writes `dist/module.json` with the `manifest` and `download` URLs for the current version.
+- `module.json` `version` is the only version number. The release tag is the bare version, for example `3.0.0`.
+- A push to the `release` branch runs `.github/workflows/release.yml`. It builds the module, fails if the tag already exists, and creates the tag and a GitHub release with `module.json` and `module.zip`.
+- To add a file or folder to the package, add it to `CONTENTS` in `scripts/build.mjs`.
 
 ## How the module works
 
@@ -35,12 +46,15 @@ There is no build step, bundler, package manager, linter or test suite. Foundry 
   - `auras`: an array of extra auras added through the API, with no limit.
   - Each aura has `distance`, `colour`, `opacity`, `square`, `permission` and `uuid`. `Auras.newAura()` returns the defaults.
 - **Permissions.** `permission` is one of `all`, `limited`, `observer`, `owner` or `gm`. `limited`, `observer` and `owner` are checked with `actor.testUserPermission(game.user, LEVEL)`.
-- **Config UI.** `Auras.onConfigRender` (`renderTokenConfig` hook) injects a nav item and a tab with plain HTML strings and jQuery. Inputs are named `flags.token-auras.auraN.<field>`, so the core form submission saves them.
-- **Rendering.** A `PIXI.Container` is added to the grid layer (`drawGridLayer` hook), below `layer.borders`. Each token gets its own child container (`token.tokenAuras`) holding one `PIXI.Graphics`.
-  - `drawToken` and `updateToken` redraw the auras.
-  - `refreshToken` moves the container to the token position.
-  - `destroyToken` destroys the container.
-- **Visibility.** Hidden tokens show no auras to non-GM users. Commits `dcd04ba` and `c7c0aa5` fixed leaks in this logic. Keep this behaviour when porting.
+- **Config UI.** `TokenConfig` and `PrototypeTokenConfig` are ApplicationV2 sheets (`HandlebarsApplicationMixin`).
+  - On `ready`, `Auras.registerConfigTabs` adds the `tokenAuras` tab to `TABS.sheet` and the `tokenAuras` part to `PARTS` (before `footer`) of every registered token sheet class and of `CONFIG.Token.prototypeSheetClass`.
+  - The `preRenderTokenConfig` and `preRenderPrototypeTokenConfig` hooks add `context.tokenAuras`. The template renders the inputs with the core `{{formGroup}}` helper and the DataFields from `Auras.getConfigFields()`.
+  - Inputs are named `flags.token-auras.auraN.<field>`, so the core form submission saves them. `TokenConfig` also shows live changes on its canvas preview token.
+- **Rendering.** Each token gets one `foundry.canvas.primary.PrimaryGraphics` (`token.tokenAuras`) in `canvas.primary`. It uses the token elevation and the sort layer just below `PrimaryCanvasGroup.SORT_LAYERS.TOKENS`, so auras render under tokens and respect elevation.
+  - `drawToken` and `updateToken` (aura flags or `hidden` changed) redraw the auras.
+  - `refreshToken` redraws on `refreshSize`/`refreshShape` (size is animated) and otherwise copies the position, elevation, alpha and visibility of the placeable.
+  - `destroyToken` destroys the graphics.
+- **Visibility.** Hidden tokens show no auras to non-GM users. Commits `dcd04ba` and `c7c0aa5` fixed leaks in this logic. Keep this behaviour. Auras also follow `token.visible`, so they hide when the token is not visible (vision, other levels, config preview).
 
 ## Public API
 
@@ -49,7 +63,7 @@ Other modules and macros use this API. Keep it working after the port:
 - The global `Auras` object, in particular `Auras.newAura()`.
 - The flag layout `flags.token-auras.aura1`, `aura2` and `auras`, and the aura object shape.
 
-`Auras` is a top-level `const` in a classic script today. If `main.js` moves to `esmodules`, expose the object explicitly (for example `globalThis.Auras` and/or `game.modules.get('token-auras').api`). Existing flag data must keep rendering without a migration.
+`main.js` is an ES module, so it exposes the object explicitly as `globalThis.Auras` and `game.modules.get('token-auras').api`. Existing flag data must keep rendering without a migration.
 
 ## Foundry API documentation
 
@@ -62,19 +76,18 @@ Consult the official API documentation before you write or change any code that 
 
 If you cannot reach the docs, say so. Do not guess an API signature.
 
-## Porting to v14
+## Foundry v14 notes
 
-Check every item below against the v14 API documentation and the release notes for v12, v13 and v14.
+The port to v14 replaced these legacy APIs. Do not reintroduce them:
 
-Known areas in `main.js` and `module.json` that are likely to break or are deprecated:
-
-- **Manifest.** Remove `name`, `minimumCoreVersion` and `compatibleCoreVersion`. Update `compatibility`, `version`, `url`, `manifest` and `download`. Consider `esmodules` instead of `scripts`.
-- **Token config sheet.** Since v13 `TokenConfig` is an ApplicationV2 sheet. Render hooks pass an `HTMLElement`, not jQuery. Tabs, `setPosition`, `_onChangeInput` and `data-edit` colour inputs come from ApplicationV1 and need replacing. The prototype token sheet (`PrototypeTokenConfig`) may also need the tab.
-- **Grid.** Since v12 `canvas.grid` is the scene's grid object, and the grid layer moved. Revisit the `drawGridLayer` hook, `layer.borders`, `canvas.grid.tokenAuras`, and the `canvas.scene.grid.type === 1` check (use `CONST.GRID_TYPES`).
-- **Namespaced globals.** Replace deprecated globals such as `Color` and `duplicate` (in the README) with their `foundry.utils` equivalents.
-- **PIXI.** Check the PIXI version bundled with v14. Replace `beginFill`/`drawEllipse`/`drawRect`/`endFill` if the API changed.
-- **Localization keys.** Check that the core keys still exist: `OWNERSHIP.*`, `USER.RoleGamemaster`, `SCENES.GridDistance`, `SCENES.GridSquare` and `GridUnits`.
-- **Token movement.** `onRefreshToken` uses the document position, so auras jump to the destination during token animation. Consider using the placeable's position instead.
+- **Manifest.** No `name`, `minimumCoreVersion`, `compatibleCoreVersion` or `scripts`. Use `esmodules` and `compatibility`.
+- **Token config sheet.** No jQuery, `setPosition`, `_onChangeInput` or `data-edit` inputs. Add UI through `PARTS`, `TABS`, templates and the ApplicationV2 render hooks, which pass an `HTMLElement`.
+- **Grid.** `canvas.grid` is the scene's `BaseGrid`. `GridLayer#borders` does not exist. Use `canvas.grid.isSquare`, `canvas.grid.size` and `canvas.grid.distance`.
+- **Globals.** Use `foundry.utils.Color` and the other namespaced classes, not the old globals.
+- **PIXI.** v14 bundles PIXI 7.4, so `beginFill`/`drawEllipse`/`drawRect`/`endFill` still work. Recheck this when Foundry moves to PIXI 8.
+- **Localization keys.** v14 removed the core keys `SCENES.GridDistance`, `SCENES.GridSquare` and `GridUnits`. The module uses `MEASUREMENT.Distance`, `SCENE.GridSquare` and the scene's grid units.
+- **Token movement.** Since v12 token animation updates the document position and size every frame. Auras use the placeable position and redraw on size refreshes.
+- **Scene Levels.** v14 only creates Token placeables for tokens in the viewed level. Aura graphics follow the placeable lifecycle, so they need no level logic.
 
 ## Conventions
 
@@ -82,7 +95,7 @@ Known areas in `main.js` and `module.json` that are likely to break or are depre
 - Match the existing style: single quotes, spaces inside the parentheses of `if ( ... )`, short methods on the `Auras` object.
 - Put new user-facing strings in `lang/en.json` with the `AURAS.` prefix. Add the same key to the other language files only when a translation is available; do not machine-translate.
 - Keep the module system-agnostic. Do not depend on a specific game system.
-- Keep changes small and focused. Do not add a build toolchain unless the user asks for one.
+- Keep changes small and focused. The build only packages files. Do not add bundling, transpiling or other build tools unless the user asks for them.
 
 ## Testing
 
