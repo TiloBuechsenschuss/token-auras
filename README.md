@@ -78,7 +78,13 @@ pnpm build
 
 The build writes `dist/module.zip` (the installable module) and `dist/module.json` (the manifest for the release).
 
-To publish a release, bump `version` in `module.json` and push to the `release` branch. The GitHub Actions workflow builds the module, creates the tag (for example `3.0.0`) and a GitHub release with both files. It fails if the tag for that version already exists.
+Run the automated tests with `pnpm test` (Node.js 22 or later). To also check the module against the client code of your Foundry installation, set `FOUNDRY_PATH`:
+
+```sh
+FOUNDRY_PATH="/path/to/Foundry Virtual Tabletop" pnpm test
+```
+
+To publish a release, bump `version` in `module.json` and push to the `release` branch. The GitHub Actions workflow runs the tests, builds the module, creates the tag (for example `3.0.0`) and a GitHub release with both files. It fails if the tag for that version already exists.
 
 The manifest URL for Foundry is `https://github.com/TiloBuechsenschuss/token-auras/releases/latest/download/module.json`.
 

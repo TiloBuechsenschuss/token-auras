@@ -23,14 +23,18 @@ This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally
 | `module.json` | Module manifest (id `token-auras`, loads `main.js` via `esmodules`). |
 | `main.js` | All module logic: the `Auras` object and its hook registrations. |
 | `templates/token-config.hbs` | Handlebars template for the Auras tab of the token configuration sheets. |
-| `package.json`, `pnpm-lock.yaml` | pnpm project for the build. The only dependency is `fflate`. |
+| `package.json`, `pnpm-lock.yaml` | pnpm project for the build and tests. Dev dependencies: `fflate` (zip) and `handlebars` (template tests). |
 | `scripts/build.mjs` | Builds `dist/module.json` and `dist/module.zip`. |
-| `.github/workflows/release.yml` | Publishes a GitHub release on every push to the `release` branch. |
+| `.github/workflows/release.yml` | Tests, builds and publishes a GitHub release on every push to the `release` branch. |
+| `.github/workflows/test.yml` | Runs the tests on other pushes and on pull requests. |
+| `tests/*.test.mjs` | Automated tests (`node:test`) against a stub of the Foundry v14 API. |
+| `tests/support/foundry.mjs` | The Foundry v14 API stub. Each stub mirrors the real v14 code. |
+| `tests/contract/foundry-v14.test.mjs` | Contract tests that check the stub assumptions against a real Foundry installation. |
 | `lang/*.json` | Translations (`en`, `de`, `fr`, `it`, `pt-BR`). Keys use the `AURAS.` prefix. |
 | `README.md` | User and API documentation. |
 | `example-*.jpg` | Screenshots referenced by the README. |
 
-Foundry loads the source files as they are. There is no bundler, transpiler, linter or test suite.
+Foundry loads the source files as they are. There is no bundler, transpiler or linter.
 
 ## Build and release
 
@@ -99,7 +103,33 @@ The port to v14 replaced these legacy APIs. Do not reintroduce them:
 
 ## Testing
 
-There are no automated tests. Verify changes manually in a Foundry v14 world:
+### Automated tests
+
+Run `pnpm test` (Node.js 22 or later). The tests use the built-in `node:test` runner and need no browser or Foundry installation.
+
+- `tests/api.test.mjs`: the public API, the aura object shape and the registered hooks.
+- `tests/config-sheet.test.mjs`: the Auras tab in `TokenConfig`, `PrototypeTokenConfig` and system subclasses. It renders the real template with Handlebars 4.7.9, the version bundled with Foundry v14, and checks the submitted flag layout.
+- `tests/canvas.test.mjs`: aura graphics, geometry, permissions, visibility, updates, previews and clean-up.
+- `tests/package.test.mjs`: `module.json`, the translations and the release package.
+
+The tests run `main.js` against `tests/support/foundry.mjs`, a stub of the v14 API. Keep the stub faithful:
+
+- When `main.js` starts to use another Foundry API, add it to the stub the way v14 implements it, and add a contract check.
+- Do not change a stub only to make a test pass. Check the real behaviour in the v14 docs or client code first.
+
+### Contract tests
+
+`tests/contract/foundry-v14.test.mjs` checks the stub assumptions against the client code of a real Foundry installation: hook names and arguments, render flags, sheet `PARTS` and `TABS`, the render order, `PrimaryGraphics`, namespaces, core translation keys and the PIXI and Handlebars versions. It is skipped unless `FOUNDRY_PATH` is set:
+
+```sh
+FOUNDRY_PATH="/path/to/Foundry Virtual Tabletop" pnpm test
+```
+
+`FOUNDRY_PATH` may point to the installation, its `resources/app` folder or its `public` folder. Run the contract tests after every Foundry update. A failing check names the module code that depends on the changed API. CI cannot run them because the Foundry client is not public.
+
+### Manual checks
+
+Verify changes manually in a Foundry v14 world:
 
 1. Enable the module and open a token's configuration. Check that the Auras tab renders and saves all fields.
 2. Check circular and square auras on square, hex and gridless scenes, with tokens of size 1 and larger.
