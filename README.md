@@ -10,11 +10,18 @@ A [FoundryVTT](https://foundryvtt.com) module for configuring token auras. Auras
 
 This is an unofficial continuation of [Token Auras](https://bitbucket.org/Fyorl/token-auras) by Kim Mantas (Fyorl). The original module supports Foundry VTT v10 and v11 and is no longer updated.
 
-This fork is maintained by Tilo Büchsenschuß at [github.com/TiloBuechsenschuss/token-auras](https://github.com/TiloBuechsenschuss/token-auras). Its goal is to port the module to **Foundry VTT v14**.
+This fork is maintained by Tilo Büchsenschuß at [github.com/TiloBuechsenschuss/token-auras](https://github.com/TiloBuechsenschuss/token-auras). It ports the module to **Foundry VTT v14**.
 
-- The port is **work in progress**. The current code still targets v10/v11 and does not work on v14 yet.
+- Version 3.0.0 and later require Foundry VTT v14. For v10 and v11, use version 2.7 of the original module.
 - Please report problems with this fork on the [GitHub issue tracker](https://github.com/TiloBuechsenschuss/token-auras/issues), not to the original author.
 - The module id stays `token-auras`, so existing aura data on your tokens keeps working.
+
+### Changes in the v14 port
+
+- The Auras tab is available in the token configuration and in the prototype token configuration of actors.
+- While the token configuration is open, the canvas preview shows aura changes before you save.
+- Auras render below tokens and use the token elevation.
+- An aura is only visible while its token is visible to you. Hidden tokens still show no auras to players.
 
 ## AI disclosure
 
@@ -40,21 +47,46 @@ A new aura can be created with:
 Auras.newAura();
 ```
 
+The `Auras` object is also available as `game.modules.get('token-auras').api`.
+
 ### Examples
+The examples use `token`, a Token placeable such as the selected token in a macro. The flags live on its TokenDocument, `token.document`.
+
 Programmatically edit the radius of an aura to be `10` grid units:
 ```js
-token.setFlag('token-auras', 'aura1.distance', 10);
+token.document.setFlag('token-auras', 'aura1.distance', 10);
 ```
 
 The UI-configurable auras are stored in `aura1` and `aura2`, but additional auras can be added by adding to the `auras` array:
 ```js
-const auras = foundry.utils.deepClone(token.getFlag('token-auras', 'auras') ?? []);
+const auras = foundry.utils.deepClone(token.document.getFlag('token-auras', 'auras') ?? []);
 const newAura = Auras.newAura();
 newAura.distance = 15;
 newAura.colour = '#ff0000';
 auras.push(newAura);
-token.setFlag('token-auras', 'auras', auras);
+token.document.setFlag('token-auras', 'auras', auras);
 ```
+
+## Building and releasing
+
+The build needs [pnpm](https://pnpm.io) and Node.js.
+
+```sh
+pnpm install
+pnpm build
+```
+
+The build writes `dist/module.zip` (the installable module) and `dist/module.json` (the manifest for the release).
+
+Run the automated tests with `pnpm test` (Node.js 22 or later). To also check the module against the client code of your Foundry installation, set `FOUNDRY_PATH`:
+
+```sh
+FOUNDRY_PATH="/path/to/Foundry Virtual Tabletop" pnpm test
+```
+
+To publish a release, bump `version` in `module.json` and push to the `release` branch. The GitHub Actions workflow runs the tests, builds the module, creates the tag (for example `3.0.0`) and a GitHub release with both files. It fails if the tag for that version already exists.
+
+The manifest URL for Foundry is `https://github.com/TiloBuechsenschuss/token-auras/releases/latest/download/module.json`.
 
 ## Credits
 
