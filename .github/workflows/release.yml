@@ -1,0 +1,64 @@
+name: Release
+
+# Every push to the release branch builds the module and publishes a GitHub release.
+# The tag is the version from module.json, so bump it before you push.
+on:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build module
+        run: pnpm run build
+
+      - name: Read version
+        id: version
+        run: echo "version=$(node -p "require('./dist/module.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Check that the tag is new
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+            echo "::error::Tag $VERSION already exists. Bump the version in module.json before you push to the release branch."
+            exit 1
+          fi
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" dist/module.json dist/module.zip \
+            --target "$GITHUB_SHA" \
+            --title "Token Auras $VERSION" \
+            --generate-notes \
+            --latest

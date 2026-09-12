@@ -1,20 +1,21 @@
 {
 	"id": "token-auras",
-	"name": "token-auras",
 	"title": "Token Auras",
 	"description": "Provide options for configuring token auras.",
-	"version": "2.7",
-	"minimumCoreVersion": "10",
-	"compatibleCoreVersion": "11",
+	"version": "3.0.0",
 	"compatibility": {
-		"minimum": 10,
-		"verified": 11
+		"minimum": "14",
+		"verified": "14"
 	},
-	"authors": [{"name": "Kim Mantas"}],
-	"scripts": ["main.js"],
-	"url": "https://bitbucket.org/Fyorl/token-auras",
-	"manifest": "https://bitbucket.org/Fyorl/token-auras/raw/master/module.json",
-	"download": "https://bitbucket.org/Fyorl/token-auras/get/2.7.zip",
+	"authors": [
+		{"name": "Kim Mantas"},
+		{"name": "Tilo Büchsenschuß", "url": "https://github.com/TiloBuechsenschuss"}
+	],
+	"esmodules": ["main.js"],
+	"url": "https://github.com/TiloBuechsenschuss/token-auras",
+	"manifest": "https://github.com/TiloBuechsenschuss/token-auras/releases/latest/download/module.json",
+	"download": "https://github.com/TiloBuechsenschuss/token-auras/releases/download/3.0.0/module.zip",
+	"bugs": "https://github.com/TiloBuechsenschuss/token-auras/issues",
 	"languages": [{
 		"lang": "en",
 		"name": "English",

@@ -1,5 +1,7 @@
 const Auras = {
 	PERMISSIONS: ['all', 'limited', 'observer', 'owner', 'gm'],
+	TAB_ID: 'tokenAuras',
+	TEMPLATE: 'modules/token-auras/templates/token-config.hbs',
 
 	getAllAuras: function (doc) {
 		return Auras.getManualAuras(doc).concat(doc.getFlag('token-auras', 'auras') || []);
@@ -22,156 +24,153 @@ const Auras = {
 		};
 	},
 
-	onConfigRender: function (config, html) {
-		const auras = Auras.getManualAuras(config.token);
-
-		// Expand the width
-		config.position.width = 540;
-		config.setPosition(config.position);
-
-		const nav = html.find('nav.sheet-tabs.tabs[data-group="main"]');
-		nav.append($(`
-			<a class="item" data-tab="auras">
-				<i class="far fa-dot-circle"></i>
-				${game.i18n.localize('AURAS.Auras')}
-			</a>
-		`));
-
-		const permissions = Auras.PERMISSIONS.map(perm => {
-			let i18n = `OWNERSHIP.${perm.toUpperCase()}`;
-			if (perm === 'all') {
-				i18n = 'AURAS.All';
-			}
-
-			if (perm === 'gm') {
-				i18n = 'USER.RoleGamemaster';
-			}
-
-			return {key: perm, label: game.i18n.localize(i18n)};
-		});
-
-		const auraConfig = auras.map((aura, idx) => `
-			<div class="form-group">
-				<label>${game.i18n.localize('AURAS.ShowTo')}</label>
-				<select name="flags.token-auras.aura${idx + 1}.permission">
-					${permissions.map(option => `
-						<option value="${option.key}"
-						        ${aura.permission === option.key ? 'selected' : ''}>
-							${option.label}
-						</option>
-					`)}
-				</select>
-			</div>
-			<div class="form-group">
-				<label>${game.i18n.localize('AURAS.AuraColour')}</label>
-				<div class="form-fields">
-					<input class="color" type="text" value="${aura.colour}"
-					       name="flags.token-auras.aura${idx + 1}.colour">
-					<input type="color" value="${aura.colour}"
-					       data-edit="flags.token-auras.aura${idx + 1}.colour">
-				</div>
-			</div>
-			<div class="form-group">
-				<label>
-					${game.i18n.localize('AURAS.Opacity')}
-					<span class="units">(0 &mdash; 1)</span>
-				</label>
-				<input type="number" value="${aura.opacity}" step="any" min="0" max="1"
-				       name="flags.token-auras.aura${idx + 1}.opacity">
-			</div>
-			<div class="form-group">
-				<label>
-					${game.i18n.localize('SCENES.GridDistance')}
-					<span class="units">(${game.i18n.localize('GridUnits')})</span>
-				</label>
-				<input type="number" value="${aura.distance ? aura.distance : ''}" step="any"
-				       name="flags.token-auras.aura${idx + 1}.distance" min="0">
-			</div>
-			<div class="form-group">
-				<label>${game.i18n.localize('SCENES.GridSquare')}</label>
-				<input type="checkbox" name="flags.token-auras.aura${idx + 1}.square"
-                       ${aura.square ? 'checked' : ''}>
-			</div>
-		`);
-
-		nav.parent().find('footer').before($(`
-			<div class="tab" data-tab="auras">
-				${auraConfig[0]}
-				<hr>
-				${auraConfig[1]}
-			</div>
-		`));
-
-		nav.parent()
-			.find('.tab[data-tab="auras"] input[type="color"][data-edit]')
-			.change(config._onChangeInput.bind(config));
-	},
-
 	uuid: function () {
 		return ([1e7] + -1e3 + -4e3 + -8e3 + -1e11)
 			.replace(/[018]/g, c =>
 				(c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16));
 	},
 
-	onRefreshToken: function (token) {
-		if ( token.tokenAuras ) {
-			const { x, y } = token.document;
-			token.tokenAuras.position.set(x, y);
+	/* -------------------------------------------- */
+	/*  Token Configuration                         */
+	/* -------------------------------------------- */
+
+	registerConfigTabs: function () {
+		for ( const sheets of Object.values(CONFIG.Token.sheetClasses) ) {
+			for ( const { cls } of Object.values(sheets) ) Auras.registerConfigTab(cls);
+		}
+		Auras.registerConfigTab(CONFIG.Token.prototypeSheetClass);
+	},
+
+	registerConfigTab: function (cls) {
+		const parts = cls?.PARTS;
+		const tabs = cls?.TABS?.sheet?.tabs;
+		if ( !parts || !Array.isArray(tabs) ) return;
+
+		if ( !tabs.some(tab => tab.id === Auras.TAB_ID) ) {
+			tabs.push({id: Auras.TAB_ID, icon: 'fa-regular fa-circle-dot', label: 'AURAS.Auras'});
+		}
+
+		// Parts render in insertion order, so the footer has to be re-added after the new part.
+		if ( !(Auras.TAB_ID in parts) ) {
+			const footer = parts.footer;
+			delete parts.footer;
+			parts[Auras.TAB_ID] = {template: Auras.TEMPLATE, scrollable: ['']};
+			if ( footer ) parts.footer = footer;
 		}
 	},
 
-	onUpdateToken: function (token, data) {
-		const aurasUpdated =
-			data.flags?.['token-auras']
-			&& ['aura1', 'aura2', 'auras'].some(k => typeof data.flags['token-auras'][k] === 'object');
+	getConfigFields: function () {
+		const fields = foundry.data.fields;
+		return Auras._configFields ??= {
+			permission: new fields.StringField({
+				required: true, blank: false, initial: 'all', label: 'AURAS.ShowTo',
+				choices: Auras.getPermissionChoices
+			}),
+			colour: new fields.ColorField({
+				required: true, nullable: false, initial: '#ffffff', label: 'AURAS.AuraColour'
+			}),
+			opacity: new fields.AlphaField({initial: .5, label: 'AURAS.Opacity'}),
+			distance: new fields.NumberField({min: 0, nullable: true, initial: null, label: 'MEASUREMENT.Distance'}),
+			square: new fields.BooleanField({label: 'SCENE.GridSquare'})
+		};
+	},
 
-		const hiddenUpdated = "hidden" in data;
-		const sizeUpdated = "width" in data || "height" in data;
+	getPermissionChoices: function () {
+		return Object.fromEntries(Auras.PERMISSIONS.map(perm => {
+			let i18n = `OWNERSHIP.${perm.toUpperCase()}`;
+			if ( perm === 'all' ) i18n = 'AURAS.All';
+			if ( perm === 'gm' ) i18n = 'USER.RoleGamemaster';
+			return [perm, i18n];
+		}));
+	},
 
-		if ( aurasUpdated || hiddenUpdated || sizeUpdated ) Auras.drawAuras(token.object);
+	onPreRenderConfig: function (config, context) {
+		if ( !(Auras.TAB_ID in config.constructor.PARTS) ) return;
+		const fields = Auras.getConfigFields();
+		context.tokenAuras = Auras.getManualAuras(config.token).map((aura, idx) => {
+			const prefix = `flags.token-auras.aura${idx + 1}`;
+			return {
+				legend: game.i18n.format('AURAS.AuraN', {number: idx + 1}),
+				uuid: {name: `${prefix}.uuid`, value: aura.uuid || Auras.uuid()},
+				inputs: [
+					{field: fields.permission, name: `${prefix}.permission`, value: aura.permission},
+					{field: fields.colour, name: `${prefix}.colour`, value: aura.colour},
+					{field: fields.opacity, name: `${prefix}.opacity`, value: aura.opacity, step: .01},
+					{field: fields.distance, name: `${prefix}.distance`, value: aura.distance, units: context.gridUnits},
+					{field: fields.square, name: `${prefix}.square`, value: aura.square}
+				]
+			};
+		});
+	},
+
+	/* -------------------------------------------- */
+	/*  Canvas Rendering                            */
+	/* -------------------------------------------- */
+
+	getVisibleAuras: function (doc) {
+		return Auras.getAllAuras(doc).filter(a => {
+			if ( !a.distance || (a.permission === 'gm' && !game.user.isGM) ) return false;
+			if ( !a.permission || a.permission === 'all' || (a.permission === 'gm' && game.user.isGM) ) return true;
+			return !!doc.actor?.testUserPermission(game.user, a.permission.toUpperCase());
+		});
+	},
+
+	onRefreshToken: function (token, flags) {
+		// Token size is animated, so the aura shape has to follow it frame by frame.
+		if ( flags.refreshSize || flags.refreshShape ) Auras.drawAuras(token);
+		else Auras.refreshAuras(token);
+	},
+
+	onUpdateToken: function (doc, changed) {
+		if ( !doc.rendered ) return;
+		const aurasUpdated = Object.keys(changed.flags ?? {}).some(k => k.includes('token-auras'));
+		if ( aurasUpdated || ('hidden' in changed) ) Auras.drawAuras(doc.object);
 	},
 
 	drawAuras: function (token) {
-		if ( token.tokenAuras?.removeChildren ) token.tokenAuras.removeChildren().forEach(c => c.destroy());
-		if ( token.document.hidden && !game.user.isGM ) return;
+		const doc = token.document;
+		const auras = (doc.hidden && !game.user.isGM) ? [] : Auras.getVisibleAuras(doc);
+		if ( !auras.length ) {
+			Auras.destroyAuras(token);
+			return;
+		}
 
-		const auras = Auras.getAllAuras(token.document).filter(a => {
-			if ( !a.distance || (a.permission === 'gm' && !game.user.isGM) ) return false;
-			if ( !a.permission || a.permission === 'all' || (a.permission === 'gm' && game.user.isGM) ) return true;
-			return !!token.document?.actor?.testUserPermission(game.user, a.permission.toUpperCase());
-		});
+		if ( !token.tokenAuras || token.tokenAuras.destroyed ) {
+			const { PrimaryGraphics } = foundry.canvas.primary;
+			const { SORT_LAYERS } = foundry.canvas.groups.PrimaryCanvasGroup;
+			token.tokenAuras = canvas.primary.addChild(new PrimaryGraphics({object: token}));
+			token.tokenAuras.sortLayer = SORT_LAYERS.TOKENS - 1;
+		}
 
-		if ( !auras.length ) return;
-
-		token.tokenAuras ??= canvas.grid.tokenAuras.addChild(new PIXI.Container());
-		const gfx = token.tokenAuras.addChild(new PIXI.Graphics());
-		const squareGrid = canvas.scene.grid.type === 1;
-		const dim = canvas.dimensions;
-		const unit = dim.size / dim.distance;
-		const [cx, cy] = [token.w / 2, token.h / 2];
-		const { width, height } = token.document;
+		const gfx = token.tokenAuras;
+		const grid = canvas.grid;
+		const unit = grid.size / grid.distance;
+		const { x: cx, y: cy } = doc.getCenterPoint({x: 0, y: 0});
+		const { width, height } = doc;
+		gfx.clear();
 
 		auras.forEach(aura => {
 			let w, h;
 
 			if ( aura.square ) {
-				w = aura.distance * 2 + (width * dim.distance);
-				h = aura.distance * 2 + (height * dim.distance);
+				w = aura.distance * 2 + (width * grid.distance);
+				h = aura.distance * 2 + (height * grid.distance);
 			} else {
 				[w, h] = [aura.distance, aura.distance];
 
-				if ( squareGrid ) {
-					w += width * dim.distance / 2;
-					h += height * dim.distance / 2;
+				if ( grid.isSquare ) {
+					w += width * grid.distance / 2;
+					h += height * grid.distance / 2;
 				} else {
-					w += (width - 1) * dim.distance / 2;
-					h += (height - 1) * dim.distance / 2;
+					w += (width - 1) * grid.distance / 2;
+					h += (height - 1) * grid.distance / 2;
 				}
 			}
 
 			w *= unit;
 			h *= unit;
-			gfx.beginFill(Color.from(aura.colour), aura.opacity);
+			const colour = foundry.utils.Color.from(aura.colour);
+			gfx.beginFill(colour.valid ? colour : 0xffffff, aura.opacity);
 
 			if ( aura.square ) {
 				const [x, y] = [cx - w / 2, cy - h / 2];
@@ -182,14 +181,37 @@ const Auras = {
 
 			gfx.endFill();
 		});
+
+		Auras.refreshAuras(token);
+	},
+
+	refreshAuras: function (token) {
+		const gfx = token.tokenAuras;
+		if ( !gfx || gfx.destroyed ) return;
+		const doc = token.document;
+		gfx.position.set(token.position.x, token.position.y);
+		gfx.elevation = doc.elevation;
+		gfx.sort = doc.sort;
+		gfx.alpha = token.alpha;
+		gfx.visible = token.visible && !(doc.hidden && !game.user.isGM);
+	},
+
+	destroyAuras: function (token) {
+		if ( token.tokenAuras?.destroyed === false ) token.tokenAuras.destroy();
+		token.tokenAuras = null;
 	}
 };
 
-Hooks.on('renderTokenConfig', Auras.onConfigRender);
+globalThis.Auras = Auras;
+
+Hooks.once('init', () => {
+	game.modules.get('token-auras').api = Auras;
+});
+
+Hooks.once('ready', Auras.registerConfigTabs);
+Hooks.on('preRenderTokenConfig', Auras.onPreRenderConfig);
+Hooks.on('preRenderPrototypeTokenConfig', Auras.onPreRenderConfig);
 Hooks.on('drawToken', Auras.drawAuras);
 Hooks.on('refreshToken', Auras.onRefreshToken);
 Hooks.on('updateToken', Auras.onUpdateToken);
-Hooks.on('drawGridLayer', layer => {
-	layer.tokenAuras = layer.addChildAt(new PIXI.Container(), layer.getChildIndex(layer.borders));
-});
-Hooks.on('destroyToken', token => token.tokenAuras?.destroy());
+Hooks.on('destroyToken', Auras.destroyAuras);
