@@ -1,4 +1,4 @@
-// A small stand-in for the parts of the Foundry VTT v14 client API that Token Auras uses.
+// A small stand-in for the parts of the Foundry VTT v14 client API that Token Auras Revitalized uses.
 // Each stub mirrors the behaviour of the real v14 code. tests/contract/foundry-v14.test.mjs checks
 // these assumptions against a real Foundry installation, so keep both files in sync.
 import { readFile } from 'node:fs/promises';

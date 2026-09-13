@@ -6,9 +6,14 @@ This file is the single source of project instructions for all agents. [CLAUDE.m
 
 ## Project
 
-Token Auras is a [Foundry VTT](https://foundryvtt.com) module. It draws coloured circular or square auras around tokens and adds an "Auras" tab to the token configuration dialog.
+Token Auras Revitalized is a [Foundry VTT](https://foundryvtt.com) module. It draws coloured circular or square auras around tokens and adds an "Auras" tab to the token configuration dialog.
 
-This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The fork targets **Foundry v14** only. Version 2.7 and older of the original module target v10/v11.
+This repository is a fork of the legacy module Token Auras by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The fork targets **Foundry v14** only. Version 2.7 and older of the original module target v10/v11.
+
+## Name and module id
+
+- The fork is named **Token Auras Revitalized**. Use this name in the manifest `title`, docs, release titles and comments. Use "Token Auras" only for the original module.
+- The module id stays `token-auras`. It is the flag scope of all stored aura data and part of the public API (see below). Do not rename the id, the flag scope, the template path `modules/token-auras/...` or the GitHub repository URLs.
 
 ## License and attribution
 
@@ -20,7 +25,7 @@ This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally
 
 | Path | Purpose |
 | --- | --- |
-| `module.json` | Module manifest (id `token-auras`, loads `main.js` via `esmodules`). |
+| `module.json` | Module manifest (id `token-auras`, title `Token Auras Revitalized`, loads `main.js` via `esmodules`). |
 | `main.js` | All module logic: the `Auras` object and its hook registrations. |
 | `templates/token-config.hbs` | Handlebars template for the Auras tab of the token configuration sheets. |
 | `package.json`, `pnpm-lock.yaml` | pnpm project for the build and tests. Dev dependencies: `fflate` (zip) and `handlebars` (template tests). |
