@@ -3,6 +3,9 @@
 	"AURAS.Auras": "Auras",
 	"AURAS.AuraN": "Aura {number}",
 	"AURAS.AuraColour": "Aura Colour",
+	"AURAS.DisplayEdge": "Display Edge",
+	"AURAS.EdgeColour": "Edge Colour",
+	"AURAS.EdgeWidth": "Edge Width (px)",
 	"AURAS.Opacity": "Opacity",
 	"AURAS.ShowTo": "Show Aura To"
 }

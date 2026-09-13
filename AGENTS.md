@@ -53,7 +53,8 @@ Foundry loads the source files as they are. There is no bundler, transpiler or l
 - **Data model.** Auras are stored as token document flags under the `token-auras` scope:
   - `aura1` and `aura2`: the two auras editable in the UI.
   - `auras`: an array of extra auras added through the API, with no limit.
-  - Each aura has `distance`, `colour`, `opacity`, `square`, `permission` and `uuid`. `Auras.newAura()` returns the defaults.
+  - Each aura has `distance`, `colour`, `opacity`, `square`, `permission`, `edge`, `edgeColour`, `edgeWidth` and `uuid`. `Auras.newAura()` returns the defaults.
+  - The edge fields are optional, because older flag data does not have them. A missing `edge` draws no edge. An empty `edgeColour` falls back to black and an empty `edgeWidth` to 1 pixel (`Auras.setEdgeStyle`).
 - **Permissions.** `permission` is one of `all`, `limited`, `observer`, `owner` or `gm`. `limited`, `observer` and `owner` are checked with `actor.testUserPermission(game.user, LEVEL)`.
 - **Config UI.** `TokenConfig` and `PrototypeTokenConfig` are ApplicationV2 sheets (`HandlebarsApplicationMixin`).
   - On `ready`, `Auras.registerConfigTabs` adds the `tokenAuras` tab to `TABS.sheet` and the `tokenAuras` part to `PARTS` (before `footer`) of every registered token sheet class and of `CONFIG.Token.prototypeSheetClass`.
@@ -130,7 +131,7 @@ The tests run `main.js` against `tests/support/foundry.mjs`, a stub of the v14 A
 FOUNDRY_PATH="/path/to/Foundry Virtual Tabletop" pnpm test
 ```
 
-`FOUNDRY_PATH` may point to the installation, its `resources/app` folder or its `public` folder. Run the contract tests after every Foundry update. A failing check names the module code that depends on the changed API. CI cannot run them because the Foundry client is not public.
+`FOUNDRY_PATH` may point to the installation, its `resources/app` folder or its `public` folder. In v14 the server serves the core libraries under `/scripts` from `resources/app/node_modules/<package>/dist` (for example `pixi.js`, `@pixi/graphics-smooth` and `handlebars`), so the contract tests read them from there when `public/scripts` does not contain them. Run the contract tests after every Foundry update. A failing check names the module code that depends on the changed API. CI cannot run them because the Foundry client is not public.
 
 ### Manual checks
 

@@ -30,9 +30,12 @@ describe('module exports', () => {
 describe('Auras.newAura', () => {
 	test('returns the documented aura shape with defaults', () => {
 		const aura = Auras.newAura();
-		assert.deepEqual(Object.keys(aura).sort(), ['colour', 'distance', 'opacity', 'permission', 'square', 'uuid']);
+		assert.deepEqual(Object.keys(aura).sort(), [
+			'colour', 'distance', 'edge', 'edgeColour', 'edgeWidth', 'opacity', 'permission', 'square', 'uuid'
+		]);
 		assert.deepEqual({...aura, uuid: undefined}, {
-			distance: null, colour: '#ffffff', opacity: .5, square: false, permission: 'all', uuid: undefined
+			distance: null, colour: '#ffffff', opacity: .5, square: false, permission: 'all', edge: false,
+			edgeColour: '#000000', edgeWidth: 1, uuid: undefined
 		});
 	});
 

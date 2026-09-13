@@ -21,6 +21,7 @@ Token Auras Revitalized is maintained by Tilo Büchsenschuß at [github.com/Tilo
 - The Auras tab is available in the token configuration and in the prototype token configuration of actors.
 - While the token configuration is open, the canvas preview shows aura changes before you save.
 - Auras render below tokens and use the token elevation.
+- Auras can display an edge with its own colour and width.
 - An aura is only visible while its token is visible to you. Hidden tokens still show no auras to players.
 
 ## AI disclosure
@@ -38,9 +39,14 @@ Aura objects have the following properties:
     opacity: number, // The opacity of the aura between 0 and 1.
     square: boolean, // The aura is square if true, otherwise it is circular.
     permission: string, // The permission level required to see this aura.
+    edge: boolean, // Draw an edge around the aura if true.
+    edgeColour: string|null, // An HTML hexadecimal colour for the edge. Empty means black.
+    edgeWidth: number|null, // The width of the edge in pixels. Empty means 1.
     uuid: string // A unique identifier for every aura.
 }
 ```
+
+The edge properties are optional. Auras without them are drawn without an edge.
 
 A new aura can be created with:
 ```js

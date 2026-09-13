@@ -442,6 +442,13 @@ export class PrimaryGraphics {
 		return this;
 	}
 
+	// SmoothGraphics#lineStyle takes a width, colour and alpha, or an options object.
+	lineStyle(width = null, color = 0, alpha = 1) {
+		const options = (typeof width === 'number') ? {width, color, alpha} : {width: 0, color: 0, alpha: 1, ...width};
+		this.commands.push({type: 'lineStyle', width: options.width, color: Number(options.color), alpha: options.alpha});
+		return this;
+	}
+
 	beginFill(color = 0, alpha = 1) {
 		this.commands.push({type: 'beginFill', color: Number(color), alpha});
 		return this;

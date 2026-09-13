@@ -19,6 +19,24 @@ function findPublicDir(base) {
 }
 
 const publicDir = findPublicDir(process.env.FOUNDRY_PATH);
+
+// The v14 server serves these /scripts files from node_modules/<package>/dist of the app folder.
+const LIBRARY_PACKAGES = {
+	'pixi.min.js': 'pixi.js',
+	'pixi-graphics-smooth.js': '@pixi/graphics-smooth',
+	'handlebars.min.js': 'handlebars'
+};
+
+/** Read a core library script the way the server resolves /scripts/<file>. */
+function readLibrary(file) {
+	const candidates = [
+		path.join(publicDir, 'scripts', file),
+		path.join(publicDir, '..', 'node_modules', ...LIBRARY_PACKAGES[file].split('/'), 'dist', file)
+	];
+	const found = candidates.find(candidate => existsSync(candidate));
+	assert.ok(found, `Cannot find ${file} in ${candidates.join(' or ')}`);
+	return readFile(found, 'utf8');
+}
 const skip = publicDir ? false : 'set FOUNDRY_PATH to a Foundry VTT v14 installation to run the contract tests';
 
 let src;
@@ -345,17 +363,23 @@ describe('Foundry VTT v14 client contract', {skip}, () => {
 
 	describe('bundled libraries', () => {
 		test('PIXI is version 7', async () => {
-			const pixi = await readFile(path.join(publicDir, 'scripts', 'pixi.min.js'), 'utf8');
+			const pixi = await readLibrary('pixi.min.js');
 			assert.match(pixi.slice(0, 200), /pixi\.js - v7\./, 'beginFill, drawEllipse and drawRect are PIXI 7 APIs.');
 		});
 
 		test('SmoothGraphics provides the drawing methods', async () => {
-			const smooth = await readFile(path.join(publicDir, 'scripts', 'pixi-graphics-smooth.js'), 'utf8');
-			for ( const name of ['beginFill(', 'drawEllipse(', 'drawRect(', 'endFill('] ) includes(smooth, name, 'Auras.drawAuras draws with these methods.');
+			const smooth = await readLibrary('pixi-graphics-smooth.js');
+			for ( const name of ['lineStyle(', 'beginFill(', 'drawEllipse(', 'drawRect(', 'endFill('] ) includes(smooth, name, 'Auras.drawAuras draws with these methods.');
+			includes(smooth, 'lineStyle(n=null,t=0,s=1,', 'Auras.setEdgeStyle passes width, colour and alpha.');
+		});
+
+		test('DataField passes its placeholder to the input', () => {
+			includes(method(block('class DataField {'), 'toInput(config={}) {'), 'inputConfig.placeholder ??= this.placeholder;',
+				'The edge colour and width inputs show their defaults as placeholders.');
 		});
 
 		test('Handlebars matches the version used by the tests', async () => {
-			const handlebars = await readFile(path.join(publicDir, 'scripts', 'handlebars.min.js'), 'utf8');
+			const handlebars = await readLibrary('handlebars.min.js');
 			const version = handlebars.slice(0, 300).match(/handlebars v(\d+\.\d+\.\d+)/)?.[1];
 			const pkg = JSON.parse(await readFile(path.join(ROOT, 'package.json'), 'utf8'));
 			assert.equal(pkg.devDependencies.handlebars, version, 'Pin the handlebars devDependency to the Foundry version.');
