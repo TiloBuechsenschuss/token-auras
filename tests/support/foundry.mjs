@@ -1,4 +1,4 @@
-// A small stand-in for the parts of the Foundry VTT v14 client API that Token Auras uses.
+// A small stand-in for the parts of the Foundry VTT v14 client API that Token Auras Revitalized uses.
 // Each stub mirrors the behaviour of the real v14 code. tests/contract/foundry-v14.test.mjs checks
 // these assumptions against a real Foundry installation, so keep both files in sync.
 import { readFile } from 'node:fs/promises';
@@ -439,6 +439,13 @@ export class PrimaryGraphics {
 	clear() {
 		this.commands = [];
 		this.clearCount++;
+		return this;
+	}
+
+	// SmoothGraphics#lineStyle takes a width, colour and alpha, or an options object.
+	lineStyle(width = null, color = 0, alpha = 1) {
+		const options = (typeof width === 'number') ? {width, color, alpha} : {width: 0, color: 0, alpha: 1, ...width};
+		this.commands.push({type: 'lineStyle', width: options.width, color: Number(options.color), alpha: options.alpha});
 		return this;
 	}
 

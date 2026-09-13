@@ -17,6 +17,10 @@ describe('module.json', () => {
 		assert.equal(manifest.id, 'token-auras');
 	});
 
+	test('uses the title Token Auras Revitalized', () => {
+		assert.equal(manifest.title, 'Token Auras Revitalized');
+	});
+
 	test('has no fields that v14 removed', () => {
 		for ( const key of ['name', 'minimumCoreVersion', 'compatibleCoreVersion', 'scripts'] ) {
 			assert.equal(key in manifest, false, `${key} must not be in module.json`);

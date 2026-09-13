@@ -1,7 +1,7 @@
 {
-	"name": "token-auras",
+	"name": "token-auras-revitalized",
 	"private": true,
-	"description": "Foundry VTT module for configuring token auras.",
+	"description": "Token Auras Revitalized, a Foundry VTT module for configuring token auras.",
 	"packageManager": "pnpm@12.4.1",
 	"scripts": {
 		"build": "node scripts/build.mjs",

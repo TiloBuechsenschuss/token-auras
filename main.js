@@ -20,6 +20,9 @@ const Auras = {
 			opacity: .5,
 			square: false,
 			permission: 'all',
+			edge: false,
+			edgeColour: '#000000',
+			edgeWidth: 1,
 			uuid: Auras.uuid()
 		};
 	},
@@ -71,7 +74,12 @@ const Auras = {
 			}),
 			opacity: new fields.AlphaField({initial: .5, label: 'AURAS.Opacity'}),
 			distance: new fields.NumberField({min: 0, nullable: true, initial: null, label: 'MEASUREMENT.Distance'}),
-			square: new fields.BooleanField({label: 'SCENE.GridSquare'})
+			square: new fields.BooleanField({label: 'SCENE.GridSquare'}),
+			edge: new fields.BooleanField({label: 'AURAS.DisplayEdge'}),
+			edgeColour: new fields.ColorField({
+				nullable: true, initial: '#000000', placeholder: '#000000', label: 'AURAS.EdgeColour'
+			}),
+			edgeWidth: new fields.NumberField({min: 1, nullable: true, initial: 1, placeholder: '1', label: 'AURAS.EdgeWidth'})
 		};
 	},
 
@@ -97,7 +105,10 @@ const Auras = {
 					{field: fields.colour, name: `${prefix}.colour`, value: aura.colour},
 					{field: fields.opacity, name: `${prefix}.opacity`, value: aura.opacity, step: .01},
 					{field: fields.distance, name: `${prefix}.distance`, value: aura.distance, units: context.gridUnits},
-					{field: fields.square, name: `${prefix}.square`, value: aura.square}
+					{field: fields.square, name: `${prefix}.square`, value: aura.square},
+					{field: fields.edge, name: `${prefix}.edge`, value: aura.edge},
+					{field: fields.edgeColour, name: `${prefix}.edgeColour`, value: aura.edgeColour},
+					{field: fields.edgeWidth, name: `${prefix}.edgeWidth`, value: aura.edgeWidth}
 				]
 			};
 		});
@@ -170,6 +181,7 @@ const Auras = {
 			w *= unit;
 			h *= unit;
 			const colour = foundry.utils.Color.from(aura.colour);
+			Auras.setEdgeStyle(gfx, aura);
 			gfx.beginFill(colour.valid ? colour : 0xffffff, aura.opacity);
 
 			if ( aura.square ) {
@@ -183,6 +195,18 @@ const Auras = {
 		});
 
 		Auras.refreshAuras(token);
+	},
+
+	setEdgeStyle: function (gfx, aura) {
+		if ( !aura.edge ) {
+			gfx.lineStyle(0);
+			return;
+		}
+
+		// Empty inputs fall back to a black edge that is 1 pixel wide.
+		const colour = foundry.utils.Color.from(aura.edgeColour);
+		const width = Number(aura.edgeWidth);
+		gfx.lineStyle(width > 0 ? width : 1, colour.valid ? colour : 0x000000, 1);
 	},
 
 	refreshAuras: function (token) {

@@ -15,6 +15,10 @@ function tokenWith(auras, data = {}) {
 	return createToken({flags: auraFlags(auras), ...data});
 }
 
+function command(token, type) {
+	return token.tokenAuras.commands.find(c => c.type === type);
+}
+
 function shapes(token) {
 	return token.tokenAuras.commands.filter(c => (c.type === 'ellipse') || (c.type === 'rect'));
 }
@@ -59,13 +63,50 @@ describe('aura graphics', () => {
 
 	test('fills with the aura colour and opacity', () => {
 		const token = tokenWith({aura1: aura({colour: '#12ab34', opacity: .25})});
-		assert.deepEqual(token.tokenAuras.commands[0], {type: 'beginFill', color: 0x12ab34, alpha: .25});
+		assert.deepEqual(command(token, 'beginFill'), {type: 'beginFill', color: 0x12ab34, alpha: .25});
 		assert.equal(token.tokenAuras.commands.at(-1).type, 'endFill');
 	});
 
 	test('falls back to white for an invalid colour', () => {
 		const token = tokenWith({aura1: aura({colour: 'not a colour'})});
-		assert.equal(token.tokenAuras.commands[0].color, 0xffffff);
+		assert.equal(command(token, 'beginFill').color, 0xffffff);
+	});
+});
+
+describe('aura edges', () => {
+	test('draws no edge by default', () => {
+		const token = tokenWith({aura1: aura()});
+		assert.equal(command(token, 'lineStyle').width, 0);
+	});
+
+	test('draws no edge for auras saved before edges existed', () => {
+		const {edge, edgeColour, edgeWidth, ...legacy} = aura({edge: true, edgeColour: '#00ff00', edgeWidth: 3});
+		const token = tokenWith({aura1: legacy});
+		assert.equal(command(token, 'lineStyle').width, 0);
+	});
+
+	test('draws the edge with its colour and width', () => {
+		const token = tokenWith({aura1: aura({edge: true, edgeColour: '#00ff00', edgeWidth: 3})});
+		assert.deepEqual(command(token, 'lineStyle'), {type: 'lineStyle', width: 3, color: 0x00ff00, alpha: 1});
+	});
+
+	for ( const [name, edgeColour, edgeWidth] of [['empty', '', null], ['missing', undefined, undefined], ['invalid', 'nope', 0]] ) {
+		test(`an ${name} edge colour and width fall back to black and 1 pixel`, () => {
+			const token = tokenWith({aura1: aura({edge: true, edgeColour, edgeWidth})});
+			assert.deepEqual(command(token, 'lineStyle'), {type: 'lineStyle', width: 1, color: 0x000000, alpha: 1});
+		});
+	}
+
+	test('sets the line style of every aura before its shape', () => {
+		resetCanvas();
+		const token = tokenWith({aura1: aura({edge: true, edgeWidth: 2}), aura2: aura(), auras: [aura({square: true, edge: true})]});
+		const types = token.tokenAuras.commands.map(c => c.type);
+		assert.deepEqual(types, [
+			'lineStyle', 'beginFill', 'ellipse', 'endFill',
+			'lineStyle', 'beginFill', 'ellipse', 'endFill',
+			'lineStyle', 'beginFill', 'rect', 'endFill'
+		]);
+		assert.deepEqual(token.tokenAuras.commands.filter(c => c.type === 'lineStyle').map(c => c.width), [2, 0, 1]);
 	});
 });
 

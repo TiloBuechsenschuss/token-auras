@@ -6,9 +6,14 @@ This file is the single source of project instructions for all agents. [CLAUDE.m
 
 ## Project
 
-Token Auras is a [Foundry VTT](https://foundryvtt.com) module. It draws coloured circular or square auras around tokens and adds an "Auras" tab to the token configuration dialog.
+Token Auras Revitalized is a [Foundry VTT](https://foundryvtt.com) module. It draws coloured circular or square auras around tokens and adds an "Auras" tab to the token configuration dialog.
 
-This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The fork targets **Foundry v14** only. Version 2.7 and older of the original module target v10/v11.
+This repository is a fork of the legacy module Token Auras by Kim Mantas (Fyorl), originally hosted at `https://bitbucket.org/Fyorl/token-auras` (git remote `fyorl`). The fork is maintained by Tilo Büchsenschuß at `https://github.com/TiloBuechsenschuss/token-auras` (git remote `origin`). The fork targets **Foundry v14** only. Version 2.7 and older of the original module target v10/v11.
+
+## Name and module id
+
+- The fork is named **Token Auras Revitalized**. Use this name in the manifest `title`, docs, release titles and comments. Use "Token Auras" only for the original module.
+- The module id stays `token-auras`. It is the flag scope of all stored aura data and part of the public API (see below). Do not rename the id, the flag scope, the template path `modules/token-auras/...` or the GitHub repository URLs.
 
 ## License and attribution
 
@@ -20,7 +25,7 @@ This repository is a fork of the legacy module by Kim Mantas (Fyorl), originally
 
 | Path | Purpose |
 | --- | --- |
-| `module.json` | Module manifest (id `token-auras`, loads `main.js` via `esmodules`). |
+| `module.json` | Module manifest (id `token-auras`, title `Token Auras Revitalized`, loads `main.js` via `esmodules`). |
 | `main.js` | All module logic: the `Auras` object and its hook registrations. |
 | `templates/token-config.hbs` | Handlebars template for the Auras tab of the token configuration sheets. |
 | `package.json`, `pnpm-lock.yaml` | pnpm project for the build and tests. Dev dependencies: `fflate` (zip) and `handlebars` (template tests). |
@@ -48,7 +53,8 @@ Foundry loads the source files as they are. There is no bundler, transpiler or l
 - **Data model.** Auras are stored as token document flags under the `token-auras` scope:
   - `aura1` and `aura2`: the two auras editable in the UI.
   - `auras`: an array of extra auras added through the API, with no limit.
-  - Each aura has `distance`, `colour`, `opacity`, `square`, `permission` and `uuid`. `Auras.newAura()` returns the defaults.
+  - Each aura has `distance`, `colour`, `opacity`, `square`, `permission`, `edge`, `edgeColour`, `edgeWidth` and `uuid`. `Auras.newAura()` returns the defaults.
+  - The edge fields are optional, because older flag data does not have them. A missing `edge` draws no edge. An empty `edgeColour` falls back to black and an empty `edgeWidth` to 1 pixel (`Auras.setEdgeStyle`).
 - **Permissions.** `permission` is one of `all`, `limited`, `observer`, `owner` or `gm`. `limited`, `observer` and `owner` are checked with `actor.testUserPermission(game.user, LEVEL)`.
 - **Config UI.** `TokenConfig` and `PrototypeTokenConfig` are ApplicationV2 sheets (`HandlebarsApplicationMixin`).
   - On `ready`, `Auras.registerConfigTabs` adds the `tokenAuras` tab to `TABS.sheet` and the `tokenAuras` part to `PARTS` (before `footer`) of every registered token sheet class and of `CONFIG.Token.prototypeSheetClass`.
@@ -125,7 +131,7 @@ The tests run `main.js` against `tests/support/foundry.mjs`, a stub of the v14 A
 FOUNDRY_PATH="/path/to/Foundry Virtual Tabletop" pnpm test
 ```
 
-`FOUNDRY_PATH` may point to the installation, its `resources/app` folder or its `public` folder. Run the contract tests after every Foundry update. A failing check names the module code that depends on the changed API. CI cannot run them because the Foundry client is not public.
+`FOUNDRY_PATH` may point to the installation, its `resources/app` folder or its `public` folder. In v14 the server serves the core libraries under `/scripts` from `resources/app/node_modules/<package>/dist` (for example `pixi.js`, `@pixi/graphics-smooth` and `handlebars`), so the contract tests read them from there when `public/scripts` does not contain them. Run the contract tests after every Foundry update. A failing check names the module code that depends on the changed API. CI cannot run them because the Foundry client is not public.
 
 ### Manual checks
 

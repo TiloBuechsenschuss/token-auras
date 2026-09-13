@@ -29,7 +29,10 @@ CONFIG.Token.sheetClasses.base.legacy = {cls: LegacyTokenConfig};
 Auras.registerConfigTabs();
 
 const TAB = 'tokenAuras';
-const aura1 = {distance: 10, colour: '#ff0000', opacity: .3, square: true, permission: 'owner', uuid: 'existing-uuid'};
+const aura1 = {
+	distance: 10, colour: '#ff0000', opacity: .3, square: true, permission: 'owner', edge: true, edgeColour: '#00ff00',
+	edgeWidth: 3, uuid: 'existing-uuid'
+};
 
 function openConfig(data = {flags: auraFlags({aura1})}, cls = TokenConfig) {
 	const token = createToken(data);
@@ -121,13 +124,13 @@ describe('rendering the token config', () => {
 	test('renders every aura field with the core formGroup helper', async () => {
 		const app = openConfig();
 		await renderSheet(app);
-		const fields = ['permission', 'colour', 'opacity', 'distance', 'square'];
+		const fields = ['permission', 'colour', 'opacity', 'distance', 'square', 'edge', 'edgeColour', 'edgeWidth'];
 		assert.deepEqual(formGroupCalls.map(c => c.hash.name), [
 			...fields.map(f => `flags.token-auras.aura1.${f}`),
 			...fields.map(f => `flags.token-auras.aura2.${f}`)
 		]);
-		assert.deepEqual(formGroupCalls.map(c => c.field.constructor.name).slice(0, 5), [
-			'StringField', 'ColorField', 'AlphaField', 'NumberField', 'BooleanField'
+		assert.deepEqual(formGroupCalls.map(c => c.field.constructor.name).slice(0, 8), [
+			'StringField', 'ColorField', 'AlphaField', 'NumberField', 'BooleanField', 'BooleanField', 'ColorField', 'NumberField'
 		]);
 		for ( const {hash} of formGroupCalls ) {
 			assert.equal(hash.localize, true);
@@ -138,7 +141,10 @@ describe('rendering the token config', () => {
 	test('fills the inputs from the token flags and defaults', async () => {
 		await renderSheet(openConfig());
 		const values = formGroupCalls.map(c => c.hash.value);
-		assert.deepEqual(values, ['owner', '#ff0000', .3, 10, true, 'all', '#ffffff', .5, null, false]);
+		assert.deepEqual(values, [
+			'owner', '#ff0000', .3, 10, true, true, '#00ff00', 3,
+			'all', '#ffffff', .5, null, false, false, '#000000', 1
+		]);
 	});
 
 	test('uses a slider step for opacity and the scene grid units for the distance', async () => {
@@ -151,7 +157,7 @@ describe('rendering the token config', () => {
 
 	test('configures the fields for the form inputs', async () => {
 		await renderSheet(openConfig());
-		const [permission, colour, opacity, distance, square] = formGroupCalls.map(c => c.field);
+		const [permission, colour, opacity, distance, square, edge, edgeColour, edgeWidth] = formGroupCalls.map(c => c.field);
 		assert.deepEqual(permission.choices(), {
 			all: 'AURAS.All', limited: 'OWNERSHIP.LIMITED', observer: 'OWNERSHIP.OBSERVER', owner: 'OWNERSHIP.OWNER',
 			gm: 'USER.RoleGamemaster'
@@ -161,8 +167,13 @@ describe('rendering the token config', () => {
 		assert.deepEqual([opacity.min, opacity.max], [0, 1]);
 		assert.equal(distance.min, 0);
 		assert.equal(distance.nullable, true);
-		assert.deepEqual([permission, colour, opacity, distance, square].map(f => f.label), [
-			'AURAS.ShowTo', 'AURAS.AuraColour', 'AURAS.Opacity', 'MEASUREMENT.Distance', 'SCENE.GridSquare'
+		// Empty edge inputs are allowed and show the fallback values as placeholders.
+		assert.equal(edgeColour.nullable, true);
+		assert.equal(edgeColour.placeholder, '#000000');
+		assert.deepEqual([edgeWidth.min, edgeWidth.nullable, edgeWidth.placeholder], [1, true, '1']);
+		assert.deepEqual([permission, colour, opacity, distance, square, edge, edgeColour, edgeWidth].map(f => f.label), [
+			'AURAS.ShowTo', 'AURAS.AuraColour', 'AURAS.Opacity', 'MEASUREMENT.Distance', 'SCENE.GridSquare',
+			'AURAS.DisplayEdge', 'AURAS.EdgeColour', 'AURAS.EdgeWidth'
 		]);
 	});
 
@@ -193,7 +204,7 @@ describe('rendering the token config', () => {
 
 	test('fires for system subclasses through the class hierarchy', async () => {
 		const {html} = await renderSheet(openConfig(undefined, SystemTokenConfig));
-		assert.equal(formGroupCalls.length, 10);
+		assert.equal(formGroupCalls.length, 16);
 		assert.match(html[TAB], /data-tab="tokenAuras"/);
 	});
 
