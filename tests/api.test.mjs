@@ -21,7 +21,7 @@ describe('module exports', () => {
 	test('registers only these Foundry hooks', () => {
 		// init and ready are once-hooks and have already fired.
 		assert.deepEqual(Hooks.registered().sort(), [
-			'destroyToken', 'drawToken', 'preRenderPrototypeTokenConfig', 'preRenderTokenConfig', 'refreshToken',
+			'destroyToken', 'drawToken', 'preCreateToken', 'preRenderPrototypeTokenConfig', 'preRenderTokenConfig', 'refreshToken',
 			'updateToken'
 		]);
 	});

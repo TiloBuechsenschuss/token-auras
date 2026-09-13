@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url';
 import Handlebars from 'handlebars';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
-export const MODULE_ID = 'token-auras';
+export const MODULE_ID = 'token-auras-revitalized';
+// The original Token Auras module. It is not active, so getFlag throws for its scope.
+export const LEGACY_ID = 'token-auras';
 
 /* -------------------------------------------- */
 /*  Constants and utilities                     */
@@ -34,6 +36,39 @@ export function expandObject(flat) {
 		target[parts.at(-1)] = value;
 	}
 	return expanded;
+}
+
+// foundry.utils.mergeObject as used by document updates: nested objects merge, other values replace.
+export function mergeObject(target, source) {
+	const isObject = value => (typeof value === 'object') && (value !== null) && !Array.isArray(value);
+	for ( const [key, value] of Object.entries(source) ) {
+		if ( isObject(value) && isObject(target[key]) ) mergeObject(target[key], value);
+		else target[key] = value;
+	}
+	return target;
+}
+
+// foundry.utils.Collection: a Map that iterates its values.
+export class Collection extends Map {
+	[Symbol.iterator]() {
+		return this.values();
+	}
+
+	map(transformer) {
+		return [...this.values()].map((value, i) => transformer(value, i, this));
+	}
+}
+
+// foundry.documents.abstract.WorldCollection, for example game.actors.
+class WorldCollection extends Collection {
+	constructor(documentClass) {
+		super();
+		this._documentClass = documentClass;
+	}
+
+	get documentClass() {
+		return this._documentClass;
+	}
 }
 
 // foundry.utils.Color: a Number subclass. Color.from() parses hex strings with or without #.
@@ -66,6 +101,15 @@ export class Hooks {
 
 	static once(hook, fn) {
 		Hooks.on(hook, fn, {once: true});
+	}
+
+	// Hooks.call stops at the first function that returns false.
+	static call(hook, ...args) {
+		for ( const entry of [...(Hooks.events[hook] ?? [])] ) {
+			if ( entry.once ) Hooks.events[hook].splice(Hooks.events[hook].indexOf(entry), 1);
+			if ( entry.fn(...args) === false ) return false;
+		}
+		return true;
 	}
 
 	static callAll(hook, ...args) {
@@ -286,9 +330,28 @@ export async function renderSheet(app, options = {}) {
 /*  Documents                                   */
 /* -------------------------------------------- */
 
+let nextActorId = 1;
+
 export class Actor {
-	constructor({ownership = {default: OWNERSHIP.NONE}} = {}) {
+	constructor({id = `actor${nextActorId++}`, ownership = {default: OWNERSHIP.NONE}, prototypeToken = {}} = {}) {
+		this.id = id;
 		this.ownership = ownership;
+		this.prototypeToken = new PrototypeToken(prototypeToken);
+		this.prototypeToken.actor = this;
+	}
+
+	// Document.updateDocuments for world actors: one database operation for all updates.
+	static async updateDocuments(updates = []) {
+		Actor.updateCalls.push(updates);
+		return updates.map(({_id, ...changes}) => globalThis.game.actors.get(_id).update(changes));
+	}
+
+	static updateCalls = [];
+
+	// PrototypeToken#update calls Actor#update({prototypeToken: data}), which merges the changes.
+	update(changes) {
+		mergeObject(this, structuredClone(changes));
+		return this;
 	}
 
 	// Document#testUserPermission
@@ -322,6 +385,7 @@ export class TokenDocument {
 			x: 0, y: 0, width: 1, height: 1, elevation: 0, sort: 0, hidden: false, shape: 0,
 			flags: {}, actor: null
 		}, data);
+		this.flags = structuredClone(this.flags);
 		this.parent = scene;
 		this._object = null;
 	}
@@ -356,6 +420,11 @@ export class TokenDocument {
 		return {x: x + (width / 2), y: y + (height / 2), elevation: data.elevation ?? this.elevation};
 	}
 
+	// DataModel#updateSource: changes the data without a database operation or hooks.
+	updateSource(changes) {
+		mergeObject(this, structuredClone(changes));
+	}
+
 	clone() {
 		const {parent, actor, _object, ...data} = this;
 		const clone = new TokenDocument(structuredClone(data), {scene: parent});
@@ -369,7 +438,7 @@ export class TokenDocument {
 	 */
 	update(changed, {userId = globalThis.game.user.id} = {}) {
 		for ( const [key, value] of Object.entries(changed) ) {
-			if ( key === 'flags' ) this.flags = {...this.flags, ...structuredClone(value)};
+			if ( key === 'flags' ) mergeObject(this.flags, structuredClone(value));
 			else this[key] = value;
 		}
 		Hooks.callAll('updateToken', this, changed, {}, userId);
@@ -554,6 +623,27 @@ export class Token {
 	}
 }
 
+// foundry.documents.Scene, reduced to its grid and its embedded tokens.
+export class Scene {
+	constructor({id = 'scene', grid = makeGrid()} = {}) {
+		this.id = id;
+		this.grid = grid;
+		this.tokens = new Collection();
+		this.updateCalls = [];
+	}
+
+	// Document#updateEmbeddedDocuments: one database operation for all updates.
+	async updateEmbeddedDocuments(embeddedName, updates = []) {
+		if ( embeddedName !== 'Token' ) throw new Error(`${embeddedName} is not handled by the stub Scene`);
+		this.updateCalls.push(updates);
+		return updates.map(({_id, ...changes}) => {
+			const doc = this.tokens.get(_id);
+			doc.update(changes);
+			return doc;
+		});
+	}
+}
+
 export function makeGrid(type = 'square', {size = 100, distance = 5, units = 'ft'} = {}) {
 	const hex = type === 'hex';
 	return {
@@ -608,8 +698,14 @@ export async function loadModule() {
 }
 
 export function resetCanvas({grid = 'square', user = 'gm'} = {}) {
-	const scene = {grid: typeof grid === 'string' ? makeGrid(grid) : grid};
-	globalThis.game.user = users[user];
+	const scene = new Scene({grid: typeof grid === 'string' ? makeGrid(grid) : grid});
+	Object.assign(globalThis.game, {
+		user: users[user],
+		users: {activeGM: users.gm},
+		scenes: new Collection([[scene.id, scene]]),
+		actors: new WorldCollection(Actor)
+	});
+	Actor.updateCalls.length = 0;
 	globalThis.canvas = {scene, grid: scene.grid, primary: new PrimaryCanvasGroup()};
 	formGroupCalls.length = 0;
 	return globalThis.canvas;
@@ -617,9 +713,16 @@ export function resetCanvas({grid = 'square', user = 'gm'} = {}) {
 
 let nextId = 1;
 
-/** Create a TokenDocument in the viewed scene and draw its Token, like TokenLayer#createObject. */
-export function createToken(data = {}, {draw = true} = {}) {
-	const doc = new TokenDocument({id: `token${nextId++}`, ...data}, {scene: globalThis.canvas.scene});
+/**
+ * Create a TokenDocument in the viewed scene and draw its Token, like TokenLayer#createObject.
+ * New tokens run the preCreateToken hook like ClientDatabaseBackend#_preCreateDocumentArray.
+ * Pass `existing` for tokens that were loaded with the world.
+ */
+export function createToken(data = {}, {draw = true, existing = false} = {}) {
+	const scene = globalThis.canvas.scene;
+	const doc = new TokenDocument({id: `token${nextId++}`, ...data}, {scene});
+	if ( !existing && (Hooks.call('preCreateToken', doc, data, {}, globalThis.game.user.id) === false) ) return null;
+	scene.tokens.set(doc.id, doc);
 	const token = new Token(doc);
 	if ( draw ) token.draw();
 	return token;

@@ -126,8 +126,8 @@ describe('rendering the token config', () => {
 		await renderSheet(app);
 		const fields = ['permission', 'colour', 'opacity', 'distance', 'square', 'edge', 'edgeColour', 'edgeWidth'];
 		assert.deepEqual(formGroupCalls.map(c => c.hash.name), [
-			...fields.map(f => `flags.token-auras.aura1.${f}`),
-			...fields.map(f => `flags.token-auras.aura2.${f}`)
+			...fields.map(f => `flags.${MODULE_ID}.aura1.${f}`),
+			...fields.map(f => `flags.${MODULE_ID}.aura2.${f}`)
 		]);
 		assert.deepEqual(formGroupCalls.map(c => c.field.constructor.name).slice(0, 8), [
 			'StringField', 'ColorField', 'AlphaField', 'NumberField', 'BooleanField', 'BooleanField', 'ColorField', 'NumberField'
@@ -180,8 +180,8 @@ describe('rendering the token config', () => {
 	test('keeps existing uuids and creates missing ones', async () => {
 		const {html} = await renderSheet(openConfig());
 		const hidden = hiddenInputs(html[TAB]);
-		assert.equal(hidden['flags.token-auras.aura1.uuid'], 'existing-uuid');
-		assert.match(hidden['flags.token-auras.aura2.uuid'], /^[0-9a-f-]{36}$/);
+		assert.equal(hidden[`flags.${MODULE_ID}.aura1.uuid`], 'existing-uuid');
+		assert.match(hidden[`flags.${MODULE_ID}.aura2.uuid`], /^[0-9a-f-]{36}$/);
 	});
 
 	test('submits the documented aura shape', async () => {

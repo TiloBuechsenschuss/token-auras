@@ -330,6 +330,32 @@ describe('Foundry VTT v14 client contract', {skip}, () => {
 		});
 	});
 
+	describe('import from Token Auras', () => {
+		test('only active packages are valid flag scopes', () => {
+			includes(src, 'if ( module.active ) scopes.push(module.id);', 'Auras.getLegacyImport reads flags.token-auras without getFlag.');
+		});
+
+		test('flags of inactive packages stay in the document data', () => {
+			includes(block('class DocumentFlagsField extends'), 'foundry.packages.BasePackage.validateId(k);',
+				'Flag keys are only checked for a valid package id, so the Token Auras data stays readable.');
+		});
+
+		test('the preCreate hook receives the pending document', () => {
+			assert.match(src, /documentAllowed &&= \(noHook \|\| Hooks(?:\$\d+)?\.call\(`preCreate\$\{type\}`, doc, createData, options, user\.id\)\);/,
+				'Auras.onPreCreateToken imports with doc.updateSource before the token is created.');
+		});
+
+		test('the APIs used by the world import exist', () => {
+			includes(src, 'async updateEmbeddedDocuments(embeddedName, updates=[], operation={}) {', 'Auras.migrateWorld updates the tokens of each scene.');
+			includes(src, 'static async updateDocuments(updates=[], operation={}) {', 'Auras.migrateWorld updates world actors.');
+			includes(src, 'return foundry.utils.getDocumentClass(this.documentName);', 'Auras.migrateWorld uses game.actors.documentClass.');
+			includes(src, 'get activeGM() {', 'Only the active GM runs Auras.migrateWorld.');
+			includes(block('class Collection extends Map'), 'return this.values();', 'Auras.migrateWorld iterates game.scenes, scene.tokens and game.actors.');
+			includes(block('class PrototypeToken extends DataModel'), 'return this.actor.update({prototypeToken: data}, options);',
+				'Prototype token flags are updated through the actor.');
+		});
+	});
+
 	describe('namespaces', () => {
 		const paths = {
 			PrimaryGraphics: 'canvas.primary.PrimaryGraphics',

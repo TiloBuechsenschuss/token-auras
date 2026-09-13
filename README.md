@@ -14,7 +14,7 @@ Token Auras Revitalized is maintained by Tilo Büchsenschuß at [github.com/Tilo
 
 - Version 3.0.0 and later require Foundry VTT v14. For v10 and v11, use version 2.7 of the original module.
 - Please report problems with this fork on the [GitHub issue tracker](https://github.com/TiloBuechsenschuss/token-auras/issues), not to the original author.
-- Only the name changed. The module id stays `token-auras`, so existing aura data on your tokens, macros and other modules keep working, and an installed copy updates in place.
+- The module id is `token-auras-revitalized`. Aura data of the original module is imported once, see [Upgrading from Token Auras](#upgrading-from-token-auras).
 
 ### Changes in the v14 port
 
@@ -22,6 +22,20 @@ Token Auras Revitalized is maintained by Tilo Büchsenschuß at [github.com/Tilo
 - While the token configuration is open, the canvas preview shows aura changes before you save.
 - Auras render below tokens and use the token elevation.
 - Auras can display an edge with its own colour and width.
+
+### Upgrading from Token Auras
+
+Token Auras Revitalized has its own module id, `token-auras-revitalized`, so Foundry treats it as a separate module. Install it with the manifest URL below. The original module does not need to be active or installed for the import.
+
+When a Gamemaster loads a world, the module imports the aura data of the original module once:
+
+- It copies `aura1`, `aura2` and `auras` from `flags.token-auras` to `flags.token-auras-revitalized`. This covers the tokens in all scenes of the world and the prototype tokens of all world actors.
+- Tokens that are created later, for example from a compendium actor, are imported when they are created. Compendium content itself is not changed.
+- A token that already has Token Auras Revitalized aura data keeps it.
+- After the import, the token gets the flag `flags.token-auras-revitalized.imported`. The module never imports the data of that token again, even if you remove its auras.
+- The data of the original module stays on the tokens.
+
+After the import, disable the original module, otherwise both modules draw the same auras. Macros and modules that use the `token-auras` flag scope or `game.modules.get('token-auras')` must change to `token-auras-revitalized`.
 - An aura is only visible while its token is visible to you. Hidden tokens still show no auras to players.
 
 ## AI disclosure
@@ -48,29 +62,31 @@ Aura objects have the following properties:
 
 The edge properties are optional. Auras without them are drawn without an edge.
 
+The flag `imported` in the `token-auras-revitalized` scope records the import from Token Auras. Do not use it for other data.
+
 A new aura can be created with:
 ```js
 Auras.newAura();
 ```
 
-The `Auras` object is also available as `game.modules.get('token-auras').api`.
+The `Auras` object is also available as `game.modules.get('token-auras-revitalized').api`.
 
 ### Examples
 The examples use `token`, a Token placeable such as the selected token in a macro. The flags live on its TokenDocument, `token.document`.
 
 Programmatically edit the radius of an aura to be `10` grid units:
 ```js
-token.document.setFlag('token-auras', 'aura1.distance', 10);
+token.document.setFlag('token-auras-revitalized', 'aura1.distance', 10);
 ```
 
 The UI-configurable auras are stored in `aura1` and `aura2`, but additional auras can be added by adding to the `auras` array:
 ```js
-const auras = foundry.utils.deepClone(token.document.getFlag('token-auras', 'auras') ?? []);
+const auras = foundry.utils.deepClone(token.document.getFlag('token-auras-revitalized', 'auras') ?? []);
 const newAura = Auras.newAura();
 newAura.distance = 15;
 newAura.colour = '#ff0000';
 auras.push(newAura);
-token.document.setFlag('token-auras', 'auras', auras);
+token.document.setFlag('token-auras-revitalized', 'auras', auras);
 ```
 
 ## Building and releasing

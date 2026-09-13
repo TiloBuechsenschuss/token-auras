@@ -13,8 +13,8 @@ const readJson = async file => JSON.parse(await readFile(path.join(ROOT, file), 
 const manifest = await readJson('module.json');
 
 describe('module.json', () => {
-	test('uses the module id token-auras', () => {
-		assert.equal(manifest.id, 'token-auras');
+	test('uses the module id token-auras-revitalized', () => {
+		assert.equal(manifest.id, 'token-auras-revitalized');
 	});
 
 	test('uses the title Token Auras Revitalized', () => {

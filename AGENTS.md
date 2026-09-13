@@ -12,8 +12,9 @@ This repository is a fork of the legacy module Token Auras by Kim Mantas (Fyorl)
 
 ## Name and module id
 
-- The fork is named **Token Auras Revitalized**. Use this name in the manifest `title`, docs, release titles and comments. Use "Token Auras" only for the original module.
-- The module id stays `token-auras`. It is the flag scope of all stored aura data and part of the public API (see below). Do not rename the id, the flag scope, the template path `modules/token-auras/...` or the GitHub repository URLs.
+- The fork is named **Token Auras Revitalized** and has the module id `token-auras-revitalized` (`Auras.MODULE_ID`). Use this name and id in the manifest, flags, template paths, docs, release titles and comments.
+- The original module is Token Auras with the id `token-auras` (`Auras.LEGACY_ID`). Refer to it only for credits and for the import of its flag data.
+- The GitHub repository is still named `token-auras`. Do not change the repository URLs.
 
 ## License and attribution
 
@@ -25,7 +26,7 @@ This repository is a fork of the legacy module Token Auras by Kim Mantas (Fyorl)
 
 | Path | Purpose |
 | --- | --- |
-| `module.json` | Module manifest (id `token-auras`, title `Token Auras Revitalized`, loads `main.js` via `esmodules`). |
+| `module.json` | Module manifest (id `token-auras-revitalized`, title `Token Auras Revitalized`, loads `main.js` via `esmodules`). |
 | `main.js` | All module logic: the `Auras` object and its hook registrations. |
 | `templates/token-config.hbs` | Handlebars template for the Auras tab of the token configuration sheets. |
 | `package.json`, `pnpm-lock.yaml` | pnpm project for the build and tests. Dev dependencies: `fflate` (zip) and `handlebars` (template tests). |
@@ -50,7 +51,7 @@ Foundry loads the source files as they are. There is no bundler, transpiler or l
 
 ## How the module works
 
-- **Data model.** Auras are stored as token document flags under the `token-auras` scope:
+- **Data model.** Auras are stored as token document flags under the `token-auras-revitalized` scope:
   - `aura1` and `aura2`: the two auras editable in the UI.
   - `auras`: an array of extra auras added through the API, with no limit.
   - Each aura has `distance`, `colour`, `opacity`, `square`, `permission`, `edge`, `edgeColour`, `edgeWidth` and `uuid`. `Auras.newAura()` returns the defaults.
@@ -59,21 +60,26 @@ Foundry loads the source files as they are. There is no bundler, transpiler or l
 - **Config UI.** `TokenConfig` and `PrototypeTokenConfig` are ApplicationV2 sheets (`HandlebarsApplicationMixin`).
   - On `ready`, `Auras.registerConfigTabs` adds the `tokenAuras` tab to `TABS.sheet` and the `tokenAuras` part to `PARTS` (before `footer`) of every registered token sheet class and of `CONFIG.Token.prototypeSheetClass`.
   - The `preRenderTokenConfig` and `preRenderPrototypeTokenConfig` hooks add `context.tokenAuras`. The template renders the inputs with the core `{{formGroup}}` helper and the DataFields from `Auras.getConfigFields()`.
-  - Inputs are named `flags.token-auras.auraN.<field>`, so the core form submission saves them. `TokenConfig` also shows live changes on its canvas preview token.
+  - Inputs are named `flags.token-auras-revitalized.auraN.<field>`, so the core form submission saves them. `TokenConfig` also shows live changes on its canvas preview token.
 - **Rendering.** Each token gets one `foundry.canvas.primary.PrimaryGraphics` (`token.tokenAuras`) in `canvas.primary`. It uses the token elevation and the sort layer just below `PrimaryCanvasGroup.SORT_LAYERS.TOKENS`, so auras render under tokens and respect elevation.
   - `drawToken` and `updateToken` (aura flags or `hidden` changed) redraw the auras.
   - `refreshToken` redraws on `refreshSize`/`refreshShape` (size is animated) and otherwise copies the position, elevation, alpha and visibility of the placeable.
   - `destroyToken` destroys the graphics.
 - **Visibility.** Hidden tokens show no auras to non-GM users. Commits `dcd04ba` and `c7c0aa5` fixed leaks in this logic. Keep this behaviour. Auras also follow `token.visible`, so they hide when the token is not visible (vision, other levels, config preview).
+- **Import from Token Auras.** `Auras.getLegacyImport` copies `aura1`, `aura2` and `auras` from `flags.token-auras` into the module scope, only if the module scope has no aura data, and sets `flags.token-auras-revitalized.imported`. A document with `imported` is never imported again.
+  - The original module is usually inactive, so `getFlag` throws for its scope. Read `doc.flags['token-auras']` directly.
+  - On `ready`, `Auras.migrateWorld` runs on the active GM only. It updates the tokens of all world scenes (one `updateEmbeddedDocuments` call per scene) and the prototype tokens of all world actors (one `updateDocuments` call).
+  - `preCreateToken` imports into new tokens with `updateSource`, for example tokens from compendium actors.
+  - The original flag data is never deleted.
 
 ## Public API
 
 Other modules and macros use this API. Keep it working after the port:
 
 - The global `Auras` object, in particular `Auras.newAura()`.
-- The flag layout `flags.token-auras.aura1`, `aura2` and `auras`, and the aura object shape.
+- The flag layout `flags.token-auras-revitalized.aura1`, `aura2` and `auras`, and the aura object shape. The key `imported` in that scope is reserved for the import.
 
-`main.js` is an ES module, so it exposes the object explicitly as `globalThis.Auras` and `game.modules.get('token-auras').api`. Existing flag data must keep rendering without a migration.
+`main.js` is an ES module, so it exposes the object explicitly as `globalThis.Auras` and `game.modules.get('token-auras-revitalized').api`. Flag data of the original module (`flags.token-auras`) must keep working through the one-time import.
 
 ## Foundry API documentation
 
@@ -116,6 +122,7 @@ Run `pnpm test` (Node.js 22 or later). The tests use the built-in `node:test` ru
 - `tests/api.test.mjs`: the public API, the aura object shape and the registered hooks.
 - `tests/config-sheet.test.mjs`: the Auras tab in `TokenConfig`, `PrototypeTokenConfig` and system subclasses. It renders the real template with Handlebars 4.7.9, the version bundled with Foundry v14, and checks the submitted flag layout.
 - `tests/canvas.test.mjs`: aura graphics, geometry, permissions, visibility, updates, previews and clean-up.
+- `tests/migration.test.mjs`: the one-time import of Token Auras flag data for world tokens, prototype tokens and new tokens.
 - `tests/package.test.mjs`: `module.json`, the translations and the release package.
 
 The tests run `main.js` against `tests/support/foundry.mjs`, a stub of the v14 API. Keep the stub faithful:
@@ -142,5 +149,6 @@ Verify changes manually in a Foundry v14 world:
 3. Log in as a player. Check each permission level, and check that hidden tokens show no auras.
 4. Move, resize, hide and delete tokens. Check that auras follow the token and leave no orphaned graphics.
 5. Run `Auras.newAura()` and the README examples in the console.
+6. Load a world with Token Auras data as GM, with the original module disabled. Check that tokens and prototype tokens show their auras, that a reload does not import again, and that a token from a compendium actor with Token Auras data is imported.
 
 State clearly which checks you ran and which you could not run.

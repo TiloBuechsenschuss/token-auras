@@ -1,15 +1,19 @@
 const Auras = {
+	MODULE_ID: 'token-auras-revitalized',
+	// The id of the original Token Auras module. Its flag data is imported once.
+	LEGACY_ID: 'token-auras',
+	AURA_KEYS: ['aura1', 'aura2', 'auras'],
 	PERMISSIONS: ['all', 'limited', 'observer', 'owner', 'gm'],
 	TAB_ID: 'tokenAuras',
-	TEMPLATE: 'modules/token-auras/templates/token-config.hbs',
+	TEMPLATE: 'modules/token-auras-revitalized/templates/token-config.hbs',
 
 	getAllAuras: function (doc) {
-		return Auras.getManualAuras(doc).concat(doc.getFlag('token-auras', 'auras') || []);
+		return Auras.getManualAuras(doc).concat(doc.getFlag(Auras.MODULE_ID, 'auras') || []);
 	},
 
 	getManualAuras: function (doc) {
-		let aura1 = doc.getFlag('token-auras', 'aura1');
-		let aura2 = doc.getFlag('token-auras', 'aura2');
+		let aura1 = doc.getFlag(Auras.MODULE_ID, 'aura1');
+		let aura2 = doc.getFlag(Auras.MODULE_ID, 'aura2');
 		return [aura1 || Auras.newAura(), aura2 || Auras.newAura()];
 	},
 
@@ -96,7 +100,7 @@ const Auras = {
 		if ( !(Auras.TAB_ID in config.constructor.PARTS) ) return;
 		const fields = Auras.getConfigFields();
 		context.tokenAuras = Auras.getManualAuras(config.token).map((aura, idx) => {
-			const prefix = `flags.token-auras.aura${idx + 1}`;
+			const prefix = `flags.${Auras.MODULE_ID}.aura${idx + 1}`;
 			return {
 				legend: game.i18n.format('AURAS.AuraN', {number: idx + 1}),
 				uuid: {name: `${prefix}.uuid`, value: aura.uuid || Auras.uuid()},
@@ -134,7 +138,7 @@ const Auras = {
 
 	onUpdateToken: function (doc, changed) {
 		if ( !doc.rendered ) return;
-		const aurasUpdated = Object.keys(changed.flags ?? {}).some(k => k.includes('token-auras'));
+		const aurasUpdated = Object.keys(changed.flags ?? {}).includes(Auras.MODULE_ID);
 		if ( aurasUpdated || ('hidden' in changed) ) Auras.drawAuras(doc.object);
 	},
 
@@ -223,16 +227,74 @@ const Auras = {
 	destroyAuras: function (token) {
 		if ( token.tokenAuras?.destroyed === false ) token.tokenAuras.destroy();
 		token.tokenAuras = null;
+	},
+
+	/* -------------------------------------------- */
+	/*  Import from Token Auras                     */
+	/* -------------------------------------------- */
+
+	hasAuraData: function (data) {
+		return !!data && Auras.AURA_KEYS.some(key => key in data);
+	},
+
+	/**
+	 * Get the flag data that imports the Token Auras data of a document, or null if there is nothing to import.
+	 * The original module is usually not active, so its flags are read directly instead of with getFlag.
+	 * The `imported` flag makes sure that the data is imported only once.
+	 */
+	getLegacyImport: function (flags) {
+		const legacy = flags?.[Auras.LEGACY_ID];
+		const current = flags?.[Auras.MODULE_ID];
+		if ( !Auras.hasAuraData(legacy) || current?.imported ) return null;
+
+		const data = {imported: true};
+		if ( Auras.hasAuraData(current) ) return data;
+		for ( const key of Auras.AURA_KEYS ) {
+			if ( key in legacy ) data[key] = structuredClone(legacy[key]);
+		}
+		return data;
+	},
+
+	migrateWorld: async function () {
+		if ( game.users.activeGM?.id !== game.user.id ) return;
+		let count = 0;
+
+		for ( const scene of game.scenes ) {
+			const updates = [];
+			for ( const token of scene.tokens ) {
+				const data = Auras.getLegacyImport(token.flags);
+				if ( data ) updates.push({_id: token.id, flags: {[Auras.MODULE_ID]: data}});
+			}
+			if ( updates.length ) await scene.updateEmbeddedDocuments('Token', updates);
+			count += updates.length;
+		}
+
+		const updates = [];
+		for ( const actor of game.actors ) {
+			const data = Auras.getLegacyImport(actor.prototypeToken.flags);
+			if ( data ) updates.push({_id: actor.id, prototypeToken: {flags: {[Auras.MODULE_ID]: data}}});
+		}
+		if ( updates.length ) await game.actors.documentClass.updateDocuments(updates);
+		count += updates.length;
+
+		if ( count ) console.log(`Token Auras Revitalized | Imported Token Auras data into ${count} tokens and prototype tokens.`);
+	},
+
+	onPreCreateToken: function (doc) {
+		const data = Auras.getLegacyImport(doc.flags);
+		if ( data ) doc.updateSource({flags: {[Auras.MODULE_ID]: data}});
 	}
 };
 
 globalThis.Auras = Auras;
 
 Hooks.once('init', () => {
-	game.modules.get('token-auras').api = Auras;
+	game.modules.get(Auras.MODULE_ID).api = Auras;
 });
 
 Hooks.once('ready', Auras.registerConfigTabs);
+Hooks.once('ready', Auras.migrateWorld);
+Hooks.on('preCreateToken', Auras.onPreCreateToken);
 Hooks.on('preRenderTokenConfig', Auras.onPreRenderConfig);
 Hooks.on('preRenderPrototypeTokenConfig', Auras.onPreRenderConfig);
 Hooks.on('drawToken', Auras.drawAuras);

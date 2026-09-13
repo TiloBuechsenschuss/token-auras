@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { beforeEach, describe, test } from 'node:test';
 import {
-	Actor, OWNERSHIP, PrimaryGraphics, SORT_LAYERS, auraFlags, createToken, loadModule, makeGrid, resetCanvas, users
+	Actor, LEGACY_ID, OWNERSHIP, PrimaryGraphics, SORT_LAYERS, auraFlags, createToken, loadModule, makeGrid, resetCanvas, users
 } from './support/foundry.mjs';
 
 await loadModule();
@@ -303,6 +303,13 @@ describe('updates', () => {
 		const token = tokenWith({aura1: aura()});
 		const count = token.tokenAuras.clearCount;
 		token.document.update({flags: {world: {note: 1}}});
+		assert.equal(token.tokenAuras.clearCount, count);
+	});
+
+	test('ignores updates of the original Token Auras flags', () => {
+		const token = tokenWith({aura1: aura()});
+		const count = token.tokenAuras.clearCount;
+		token.document.update({flags: {[LEGACY_ID]: {aura1: aura({distance: 20})}}});
 		assert.equal(token.tokenAuras.clearCount, count);
 	});
 
